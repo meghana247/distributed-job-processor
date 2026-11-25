@@ -1,0 +1,51 @@
+x-backend: &backend
+  build: .
+  environment:
+    DATABASE_URL: postgresql+psycopg://jobs:jobs@db:5432/jobs
+    REDIS_URL: redis://redis:6379/0
+    JWT_SECRET: ${JWT_SECRET:-local-dev-secret-change-me-0123456789abcdef}
+    MOCK_BASE_URL: http://api:8000
+  depends_on:
+    db: { condition: service_healthy }
+    redis: { condition: service_healthy }
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment: { POSTGRES_USER: jobs, POSTGRES_PASSWORD: jobs, POSTGRES_DB: jobs }
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jobs"]
+      interval: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      retries: 10
+
+  api:
+    <<: *backend
+    ports: ["8001:8000"]
+
+  # Scale out with: docker compose up -d --scale worker=3
+  worker:
+    <<: *backend
+    command: celery -A app.celery_app worker --concurrency 4 --hostname worker-%h --loglevel INFO
+    depends_on:
+      api: { condition: service_started }
+
+  # Runs the reaper on a schedule. Exactly one instance.
+  beat:
+    <<: *backend
+    command: celery -A app.celery_app beat --loglevel INFO --schedule /tmp/celerybeat-schedule
+
+  web:
+    build: ./frontend
+    ports: ["3001:80"]
+    depends_on: [api]
+
+volumes:
+  pgdata:
