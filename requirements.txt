@@ -1,0 +1,11 @@
+fastapi==0.115.*
+uvicorn[standard]==0.32.*
+sqlalchemy==2.0.*
+psycopg[binary]==3.2.*
+celery[redis]==5.4.*
+kombu==5.4.*  # kombu 5.5+ needs redis-py 6, which celery 5.4 does not allow
+pydantic-settings==2.6.*
+email-validator==2.2.*
+pyjwt==2.10.*
+bcrypt==4.2.*
+httpx==0.28.*
